@@ -3,9 +3,24 @@ import Thread from 'App/Models/Thread'
 import ThreadValidator from 'App/Validators/ThreadValidator'
 
 export default class ThreadsController {
-  public async index({ response }: HttpContextContract) {
+  public async index({ request, response }: HttpContextContract) {
     try {
-      const threads = await Thread.query().preload('user').preload('category').preload('replies')
+      const page = request.input('page', 1)
+      const limit = request.input('limit', 10)
+      const userId = request.input('user_id')
+      const categoryId = request.input('category_id')
+
+      const threads = await Thread.query()
+        .if(userId, (query) => {
+          query.where('user_id', userId)
+        })
+        .if(categoryId, (query) => {
+          query.where('category_id', categoryId)
+        })
+        .preload('user')
+        .preload('category')
+        .preload('replies')
+        .paginate(page, limit)
       return response.status(200).json({
         data: threads,
       })

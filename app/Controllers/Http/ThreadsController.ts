@@ -1,4 +1,5 @@
 import type { HttpContextContract } from '@ioc:Adonis/Core/HttpContext'
+import UnauthorizedException from 'App/Exceptions/UnauthorizedException'
 import Thread from 'App/Models/Thread'
 import SortThreadValidator from 'App/Validators/SortThreadValidator'
 import ThreadValidator from 'App/Validators/ThreadValidator'
@@ -12,8 +13,8 @@ export default class ThreadsController {
       const categoryId = request.input('category_id')
 
       const sortValidated = await request.validate(SortThreadValidator)
-      const sortBy = sortValidated.sort_by || 'id'
-      const order = sortValidated.order || 'asc'
+      const sortBy = sortValidated.sort_by ?? 'id'
+      const order = sortValidated.order ?? 'asc'
 
       const threads = await Thread.query()
         .if(userId, (query) => {
@@ -79,9 +80,7 @@ export default class ThreadsController {
       const thread = await Thread.findOrFail(params.id)
 
       if (thread.userId !== user?.id) {
-        return response.status(403).json({
-          message: 'You are not authorized to update this thread',
-        })
+        throw new UnauthorizedException('Unauthorized', 403, 'E_UNAUTHORIZED')
       }
 
       const validateData = await request.validate(ThreadValidator)
@@ -95,9 +94,20 @@ export default class ThreadsController {
         data: thread,
       })
     } catch (error) {
-      return response.status(404).json({
-        message: error.message,
-      })
+      switch (error.name) {
+        case 'UnauthorizedException':
+          return response.status(error.status).json({
+            message: error.message,
+          })
+        case 'ModelNotFoundException':
+          return response.status(404).json({
+            message: 'Thread not found',
+          })
+        default:
+          return response.status(500).json({
+            message: error.message,
+          })
+      }
     }
   }
 
